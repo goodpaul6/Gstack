@@ -142,12 +142,4 @@ define list_test
 	}
 }
 
-@hash.new create myhash
-
-myhash "test" 0 @hash.put
-myhash "test" @hash.get @io.putn
-'\n' @putchar
-myhash "test2" 1 @hash.put
-myhash "test2" @hash.get @io.putn
-'\n' @putchar
-
+@hash.new

@@ -3,7 +3,8 @@
 #include <string.h>
 #include "gstack.h"
 
-#define HASH_TABLE_ENTRIES_AMT	2048
+#define HASH_TABLE_ENTRIES_AMT		2048
+#define MAX_CONVERTED_STRING_LEN	128
 
 void add_prim(gstate_t* state)
 {
@@ -251,16 +252,21 @@ void list_create_prim(gstate_t* state)
 	gpush_native(state, list, list_on_mark, NULL, list_on_gc);
 }
 
-void list_append_prim(gstate_t* state)
+static void list_extend(nat_list_t* list)
 {
-	gobject_t* obj = gpop_object(state);
-	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
-	list->length += 1;
 	while(list->length >= list->capacity) 
 	{
 		list->capacity *= 2;
 		list_realloc(list);
 	}
+}
+
+void list_append_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_object(state);
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	list->length += 1;
+	list_extend(list);
 	list->items[list->length - 1] = obj;
 }
 
@@ -295,6 +301,16 @@ void list_length_prim(gstate_t* state)
 	gpush_number(state, list->length);
 }
 
+void list_resize_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	long val = (long)obj->number.value;
+	if(val < 0) gfatal_error("cannot resize list to value lower than 0\n");
+	list->length = val;
+	list_extend(list);
+}
+
 void list_clear_prim(gstate_t* state)
 {
 	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
@@ -311,6 +327,13 @@ void io_putn_prim(gstate_t* state)
 {
 	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
 	if(!printf("%f", obj->number.value)) gfatal_error("io.putn failed\n");
+}
+
+void io_putnp_prim(gstate_t* state)
+{
+	gobject_t* prec = gpop_expect(state, OBJ_NUMBER);
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	if(!printf("%.*f", prec->number.value, obj->number.value)) gfatal_error("io.putnp failed\n");
 }
 
 void io_putb_prim(gstate_t* state)
@@ -523,6 +546,27 @@ void hash_table_get_prim(gstate_t* state)
 	gfatal_error("attempted to access non-existent key in hash table (%s)\n", key->string.value);
 }
 
+void hash_table_exists_prim(gstate_t* state)
+{
+	gobject_t* key = gpop_expect(state, OBJ_STRING);
+	nat_hash_table_t* table = (nat_hash_table_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+
+	size_t idx = hash_function(key->string.value) % HASH_TABLE_ENTRIES_AMT;
+
+	nat_hash_entry_t* entry = table->entries[idx];
+	
+	while(entry)
+	{
+		if(strcmp(key->string.value, entry->key) == 0)
+		{
+			gpush_boolean(state, 1);
+			return;
+		}
+		entry = entry->next;
+	}
+	gpush_boolean(state, 0);
+}
+
 void hash_table_set_prim(gstate_t* state)
 {
 	gobject_t* value = gpop_object(state);
@@ -566,6 +610,36 @@ void hash_table_remove_prim(gstate_t* state)
 	}
 }
 
+void tostring_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_object(state);
+	
+	char* buffer = malloc(sizeof(char) * MAX_CONVERTED_STRING_LEN);
+	if(!buffer) gfatal_error("out of memory\n");
+	long length = 0;
+	
+	switch(obj->type)
+	{
+		case OBJ_NUMBER:
+			length = sprintf(buffer, "%f", obj->number.value);
+			break;
+		case OBJ_BOOLEAN:
+			length = sprintf(buffer, "%s", obj->boolean.value ? "true" : "false");
+			break;
+		case OBJ_STRING:
+			gfatal_error("attempted to convert string to a string, this is most likely an error\n");
+			break;
+		case OBJ_NATIVE:
+			gfatal_error("cannot convert native object to string, maybe this native object has a specific function for that very purpose\n");
+			break;
+		case OBJ_PAIR:
+			gfatal_error("cannot convert pair to string\n");
+			break;
+	}
+	
+	gpush_string(state, buffer, length, 0);
+}
+
 static gprimitivereg_t standard_library[] =
 {
 	{"add", add_prim},
@@ -598,9 +672,11 @@ static gprimitivereg_t standard_library[] =
 	{"list.depend", list_depend_prim},
 	{"list.length", list_length_prim},
 	{"list.set", list_set_prim},
+	{"list.resize", list_resize_prim},
 	{"list.clear", list_clear_prim},
 	{"io.puts", io_puts_prim},
-	{"io.putn", io_putn_prim}, 
+	{"io.putn", io_putn_prim},
+	{"io.putnp", io_putnp_prim}, 
 	{"io.putb", io_putb_prim},
 	{"strbuf.new", sbuf_create_prim},
 	{"strbuf.append.char", sbuf_append_char_prim},
@@ -611,10 +687,12 @@ static gprimitivereg_t standard_library[] =
 	{"strbuf.tostring", sbuf_tostring_prim},
 	{"hash.new", hash_table_create_prim},
 	{"hash.put", hash_table_put_prim},
+	{"hash.exists", hash_table_exists_prim},
 	{"hash.get", hash_table_get_prim},
 	{"hash.set", hash_table_set_prim},
 	{"hash.remove", hash_table_remove_prim},
-	{"tonumber", tonumber_prim}, 
+	{"tonumber", tonumber_prim},
+	{"tostring", tostring_prim}, 
 	{"", NULL}
 };
 
