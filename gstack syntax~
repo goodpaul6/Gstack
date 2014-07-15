@@ -1,8 +1,0 @@
-if { 1 } { 0 } else { 1 }
-if { 2 } { 0 } else { 3 }
-
-define main
-{
-	"hello world" @print
-	"2 233 12312312i391239 12u93u1203u12u30812u891248 932y984 y1982y934y2934y9123h4 213489 h1234" @print
-}
