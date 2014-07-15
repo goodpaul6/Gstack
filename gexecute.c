@@ -47,7 +47,7 @@ static void do_node(gstate_t* state, gexpr_t* exp)
 		gpush_boolean(state, exp->boolexpr.value);
 		break;
 	case EXPR_STRING:
-		gpush_string(state, exp->strexpr.value, exp->strexpr.length);
+		gpush_string(state, exp->strexpr.value, exp->strexpr.length, 1);
 		break;
 	case EXPR_SYMBOL:
 		if(strcmp(exp->symexpr.value, "break") == 0)
@@ -89,9 +89,9 @@ static void do_node(gstate_t* state, gexpr_t* exp)
 	case EXPR_IF:
 		do_node(state, exp->ifexpr.cond);
 		if(is_true(gpop_object(state)))
-			do_node(state, exp->ifexpr.true_block);
-		else if(exp->ifexpr.false_block)
-			do_node(state, exp->ifexpr.false_block);
+			do_node(state, exp->ifexpr.true_expr);
+		else if(exp->ifexpr.false_expr)
+			do_node(state, exp->ifexpr.false_expr);
 		break;
 	case EXPR_BLOCK:
 		gsymbol_push(state);

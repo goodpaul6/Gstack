@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #define MAX_TOKEN_LEN		1024
-#define	MAX_STACK_LEN		128
+#define	MAX_STACK_LEN		1024
 #define INITIAL_GC_THRES	8
 
 void gfatal_error(const char* format, ...);
@@ -78,7 +78,7 @@ typedef struct gexpr
 		struct { char* value; } callexpr;
 		struct { char* name; struct gexpr* block; } defexpr;
 		struct { struct gexpr* cond; struct gexpr* block; } whileexpr;
-		struct { struct gexpr* cond; struct gexpr* true_block; struct gexpr* false_block; } ifexpr;
+		struct { struct gexpr* cond; struct gexpr* true_expr; struct gexpr* false_expr; } ifexpr;
 		struct { struct gexpr* block_head; } blockexpr;
 		struct { char* name; } setexpr;
 		struct { char* name; } createexpr;
@@ -125,7 +125,7 @@ typedef struct gobject
 	{
 		struct { float value; } number;
 		struct { char value; } boolean;
-		struct { char* value; long length; } string;
+		struct { char* value; long length; char is_lit; } string;
 		struct { struct gobject* head; struct gobject* tail; } pair;
 		struct { void* value; void (*on_mark)(void** val); void (*on_unmark)(void** val); void (*on_gc)(void** val); } native;
 	};
@@ -144,7 +144,7 @@ gobject_t* gpeek_expect(struct gstate* state, gobject_type_t type);
 
 void gpush_number(struct gstate* state, float value);
 void gpush_boolean(struct gstate* state, char value);
-void gpush_string(struct gstate* state, char* value, long length);
+void gpush_string(struct gstate* state, char* value, long length, char is_literal);
 void gpush_pair(struct gstate* state);
 void gpush_native(struct gstate* state, void* value, void (*on_mark)(void** val), void (*on_unmark)(void** val), void (*on_gc)(void** val));
 

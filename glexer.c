@@ -19,6 +19,27 @@ static void geat_whitespace(FILE* in)
 		ungetc(c, in);
 }
 
+static int escape_seq(char c)
+{
+	switch(c)
+	{
+		case 'n':
+			return '\n';
+		case '0':
+			return '\0';
+		case 't':
+			return '\t';
+		case '\'':
+			return '\'';
+		case '"':
+			return '\"';
+		case '\\':
+			return '\\';
+	}
+	gfatal_error("invalid escape sequence ('\%c')\n", c);
+	return 0;
+}
+
 void gread_token()
 {
 	FILE* in = ginput_stream;
@@ -107,6 +128,11 @@ void gread_token()
 	{
 		gtoken.buffer[0] = '\'';
 		c = fgetc(in);
+		if(c == '\\')
+		{
+			c = fgetc(in);
+			c = escape_seq(c);
+		}
 		gtoken.number = (float)c;
 		gtoken.buffer[1] = c;
 		gtoken.type = TOK_NUMBER;
@@ -118,7 +144,12 @@ void gread_token()
 		c = fgetc(in);
 		i = 0;
 		while(c != '"')
-		{
+		{			
+			if(c == '\\')
+			{
+				c = fgetc(in);
+				c = escape_seq(c);
+			}
 			if(i < MAX_TOKEN_LEN - 1) 
 				gtoken.buffer[i++] = c;
 			else

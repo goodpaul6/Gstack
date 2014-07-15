@@ -3,6 +3,8 @@
 #include <string.h>
 #include "gstack.h"
 
+#define HASH_TABLE_ENTRIES_AMT	2048
+
 void add_prim(gstate_t* state)
 {
 	gobject_t* n2 = gpop_expect(state, OBJ_NUMBER);
@@ -254,7 +256,7 @@ void list_append_prim(gstate_t* state)
 	gobject_t* obj = gpop_object(state);
 	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
 	list->length += 1;
-	if(list->length == list->capacity) 
+	while(list->length >= list->capacity) 
 	{
 		list->capacity *= 2;
 		list_realloc(list);
@@ -266,8 +268,18 @@ void list_get_prim(gstate_t* state)
 {
 	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
 	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
-	if((int)obj->number.value >= list->length) gfatal_error("list index is out of bounds (%ld)\n", (long)obj->number.value); 
-	gpush_object(state, list->items[(int)obj->number.value]);
+	if((long)obj->number.value >= list->length) gfatal_error("list index is out of bounds (%ld)\n", (long)obj->number.value); 
+	gpush_object(state, list->items[(long)obj->number.value]);
+}
+
+void list_set_prim(gstate_t* state)
+{
+	gobject_t* idxobj = gpop_expect(state, OBJ_NUMBER);
+	gobject_t* obj = gpop_object(state);
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	long idx = (long)(idxobj->number.value);
+	if(idx >= list->length) gfatal_error("list index is out of bounds (%ld)\n", (long)obj->number.value);
+	list->items[idx] = obj;
 }
 
 void list_depend_prim(gstate_t* state)
@@ -281,6 +293,277 @@ void list_length_prim(gstate_t* state)
 {
 	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);	
 	gpush_number(state, list->length);
+}
+
+void list_clear_prim(gstate_t* state)
+{
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	list->length = 0;
+}
+
+void io_puts_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_STRING);
+	if(!puts(obj->string.value)) gfatal_error("io.puts failed\n");
+}
+
+void io_putn_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	if(!printf("%f", obj->number.value)) gfatal_error("io.putn failed\n");
+}
+
+void io_putb_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_BOOLEAN);
+	if(!printf("%s", obj->boolean.value ? "true" : "false")) gfatal_error("io.putb failed\n");
+}
+
+typedef struct nat_sbuf
+{
+	size_t capacity;
+	size_t length;
+	char* str;
+} nat_sbuf_t;
+
+static void sbuf_realloc(nat_sbuf_t* sbuf)
+{
+	char* new_buf = realloc(sbuf->str, sbuf->capacity * sizeof(char));
+	if(!new_buf) gfatal_error("out of memory\n");
+	sbuf->str = new_buf;
+}
+
+void sbuf_on_gc(void** value)
+{
+	nat_sbuf_t* sbuf = (nat_sbuf_t*)(*value);
+	free(sbuf->str);
+	free(sbuf);
+	*value = NULL;
+}
+
+static void sbuf_extend(nat_sbuf_t* sbuf)
+{	
+	while(sbuf->length + 1 >= sbuf->capacity)
+	{
+		sbuf->capacity *= 2;
+		sbuf_realloc(sbuf);
+	}
+}
+
+void sbuf_create_prim(gstate_t* state)
+{
+	nat_sbuf_t* sbuf = malloc(sizeof(nat_sbuf_t));
+	sbuf->capacity = 2;
+	sbuf->length = 0;
+	sbuf->str = NULL;
+	sbuf_realloc(sbuf);
+	gpush_native(state, sbuf, NULL, NULL, sbuf_on_gc);
+}
+
+static void append_char(nat_sbuf_t* sbuf, char c)
+{
+	sbuf->length += 1;
+	sbuf_extend(sbuf);
+	sbuf->str[sbuf->length - 1] = c;
+	sbuf->str[sbuf->length] = '\0';
+}
+
+void sbuf_append_char_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	char c = (char)obj->number.value;
+	nat_sbuf_t* sbuf = (nat_sbuf_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	append_char(sbuf, c);
+}
+
+void sbuf_append_str_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_STRING);
+	nat_sbuf_t* sbuf = (nat_sbuf_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	long i; for(i = 0; i < obj->string.length; i++)
+		append_char(sbuf, obj->string.value[i]);
+}
+
+void sbuf_clear_prim(gstate_t* state)
+{
+	nat_sbuf_t* sbuf = (nat_sbuf_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	sbuf->str[0] = '\0';
+	sbuf->length = 0;
+}
+
+void sbuf_tostring_prim(gstate_t* state)
+{
+	nat_sbuf_t* sbuf = (nat_sbuf_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	gpush_string(state, strdup(sbuf->str), sbuf->length, 0);
+}
+
+void tonumber_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_object(state);
+	float number;
+	
+	switch(obj->type)
+	{
+		case OBJ_NUMBER:
+			number = obj->number.value;
+			break;
+		case OBJ_BOOLEAN:
+			number = obj->boolean.value ? 1 : 0;
+			break;
+		case OBJ_STRING:
+			number = (float)strtod(obj->string.value, NULL);
+			break;
+		case OBJ_PAIR:
+			gfatal_error("cannot convert pair to number\n");
+			break;
+		case OBJ_NATIVE:
+			gfatal_error("cannot convert native object to number\n");
+			break;
+	}
+	
+	gpush_number(state, number);
+}
+
+typedef struct nat_hash_entry
+{
+	char* key;
+	gobject_t* value;					
+	struct nat_hash_entry* next;		
+} nat_hash_entry_t;
+
+typedef struct nat_hash_table
+{
+	nat_hash_entry_t* entries[HASH_TABLE_ENTRIES_AMT];
+} nat_hash_table_t;
+
+static size_t hash_function(char* key)
+{
+	char* str = key;
+	unsigned long hash = 5381;
+	int c;
+
+	while ((c = *str++))
+		hash = ((hash << 5) + hash) + c; /* hash * 33 + c */
+
+	return hash;
+}
+
+void hash_table_on_mark(void** value)
+{
+	nat_hash_table_t* table = (nat_hash_table_t*)(*value);
+	long i; for(i = 0; i < HASH_TABLE_ENTRIES_AMT; i++)
+	{
+		nat_hash_entry_t* entry = table->entries[i];
+		while(entry)
+		{
+			gmark_object(entry->value);
+			entry = entry->next;
+		}
+	}
+}
+
+void hash_table_on_gc(void** value)
+{
+	nat_hash_table_t* table = (nat_hash_table_t*)(*value);
+	long i; for(i = 0; i < HASH_TABLE_ENTRIES_AMT; i++)
+	{
+		nat_hash_entry_t* entry = table->entries[i];
+		while(entry)
+		{
+			nat_hash_entry_t* next = entry->next;
+			free(entry->key);
+			free(entry);
+			entry = next;
+		}
+	}
+	free(*value);
+}
+
+void hash_table_create_prim(gstate_t* state)
+{
+	nat_hash_table_t* table = calloc(1, sizeof(nat_hash_table_t));
+	if(!table) gfatal_error("out of memory\n");
+	gpush_native(state, table, hash_table_on_mark, NULL, hash_table_on_gc);
+}
+
+void hash_table_put_prim(gstate_t* state)
+{
+	gobject_t* value = gpop_object(state);
+	gobject_t* key = gpop_expect(state, OBJ_STRING);
+	nat_hash_table_t* table = (nat_hash_table_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	
+	char* keydup = strdup(key->string.value);
+	nat_hash_entry_t* entry = calloc(1, sizeof(nat_hash_entry_t));
+	if(!entry) gfatal_error("out of memory\n");
+	entry->key = keydup;
+	entry->value = value;
+	size_t idx = hash_function(keydup) % HASH_TABLE_ENTRIES_AMT;
+	entry->next = table->entries[idx];
+	table->entries[idx] = entry;
+}
+
+void hash_table_get_prim(gstate_t* state)
+{
+	gobject_t* key = gpop_expect(state, OBJ_STRING);
+	nat_hash_table_t* table = (nat_hash_table_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+
+	size_t idx = hash_function(key->string.value) % HASH_TABLE_ENTRIES_AMT;
+
+	nat_hash_entry_t* entry = table->entries[idx];
+	
+	while(entry)
+	{
+		if(strcmp(key->string.value, entry->key) == 0)
+		{
+			gpush_object(state, entry->value);
+			return;
+		}
+		entry = entry->next;
+	}
+	gfatal_error("attempted to access non-existent key in hash table (%s)\n", key->string.value);
+}
+
+void hash_table_set_prim(gstate_t* state)
+{
+	gobject_t* value = gpop_object(state);
+	gobject_t* key = gpop_expect(state, OBJ_STRING);
+	nat_hash_table_t* table = (nat_hash_table_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+
+	size_t idx = hash_function(key->string.value) % HASH_TABLE_ENTRIES_AMT;
+
+	nat_hash_entry_t* entry = table->entries[idx];
+	
+	while(entry)
+	{
+		if(strcmp(key->string.value, entry->key) == 0)
+		{
+			entry->value = value;
+			return;
+		}
+		entry = entry->next;
+	}
+}
+
+void hash_table_remove_prim(gstate_t* state)
+{
+	gobject_t* key = gpop_expect(state, OBJ_STRING);
+	nat_hash_table_t* table = (nat_hash_table_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+
+	size_t idx = hash_function(key->string.value) % HASH_TABLE_ENTRIES_AMT;
+
+	nat_hash_entry_t* entry = table->entries[idx];	
+	while(entry)
+	{
+		if(strcmp(key->string.value, entry->key) == 0)
+		{
+			nat_hash_entry_t* next = entry->next;
+			free(entry->key);
+			free(entry);
+			table->entries[idx] = next;
+			return;
+		}
+		entry = entry->next;
+	}
 }
 
 static gprimitivereg_t standard_library[] =
@@ -314,6 +597,24 @@ static gprimitivereg_t standard_library[] =
 	{"list.append", list_append_prim},
 	{"list.depend", list_depend_prim},
 	{"list.length", list_length_prim},
+	{"list.set", list_set_prim},
+	{"list.clear", list_clear_prim},
+	{"io.puts", io_puts_prim},
+	{"io.putn", io_putn_prim}, 
+	{"io.putb", io_putb_prim},
+	{"strbuf.new", sbuf_create_prim},
+	{"strbuf.append.char", sbuf_append_char_prim},
+	{"strbuf.append.str", sbuf_append_str_prim},
+	{"strbuf.char", sbuf_append_char_prim},
+	{"strbuf.str", sbuf_append_str_prim},
+	{"strbuf.clear", sbuf_clear_prim},
+	{"strbuf.tostring", sbuf_tostring_prim},
+	{"hash.new", hash_table_create_prim},
+	{"hash.put", hash_table_put_prim},
+	{"hash.get", hash_table_get_prim},
+	{"hash.set", hash_table_set_prim},
+	{"hash.remove", hash_table_remove_prim},
+	{"tonumber", tonumber_prim}, 
 	{"", NULL}
 };
 

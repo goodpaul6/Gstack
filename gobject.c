@@ -19,6 +19,11 @@ gobject_t* gmake_object(gstate_t* state, gobject_type_t type)
 void gdestroy_object(gobject_t* obj)
 {
 	if(!obj) return;
+	if(obj->type == OBJ_STRING)
+	{
+		if(!obj->string.is_lit)
+			free(obj->string.value);
+	}
 	free(obj);
 }
 
@@ -68,11 +73,12 @@ void gpush_boolean(gstate_t* state, char value)
 	gpush_object(state, obj);
 }
 
-void gpush_string(gstate_t* state, char* value, long length)
+void gpush_string(gstate_t* state, char* value, long length, char is_literal)
 {
 	gobject_t* obj = gmake_object(state, OBJ_STRING);
 	obj->string.value = value;
 	obj->string.length = length;
+	obj->string.is_lit = is_literal;
 	gpush_object(state, obj);
 }
 

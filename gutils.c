@@ -55,11 +55,11 @@ void gdebug_expr(gexpr_t* exp)
 		printf("	condition:\n");
 		gdebug_expr(exp->ifexpr.cond);
 		printf("	true block:\n");
-		gdebug_expr(exp->ifexpr.true_block);
-		if(exp->ifexpr.false_block)
+		gdebug_expr(exp->ifexpr.true_expr);
+		if(exp->ifexpr.false_expr)
 		{
 			printf("	false block:\n");
-			gdebug_expr(exp->ifexpr.false_block);
+			gdebug_expr(exp->ifexpr.false_expr);
 		}
 		break;
 	case EXPR_BLOCK:

@@ -23,19 +23,131 @@ define logic.and { if { @dup } { @drop if { @dup } { @drop true } } else { false
 define logic.or { if { @dup } { true } else { @drop if { @dup } { true } else { false } } }
 define logic.not { if { @dup } { false } else { true } }
 
-10 create i
-@list.new create list
-
-while { i } 
+define isspace 
 {
-	list i @list.append
-	i 1 @sub set i
+	if { @dup ' ' @equals } { true } else { if { @dup '\t' @equals } { true } else { if { @dup '\n' @equals } { true } else { false } } }
 }
 
-while { i 10 @lt }
+define isalpha
 {
-	list i @list.get @debug.println
-	i 1 @add set i
+	create c
+	if { c 'a' @gte c 'z' @lte @logic.and } { true } 
+	else 
+	{ 
+		if { c 'A' @gte c 'Z' @lte @logic.and } { true } else { false }
+	}
 }
 
-list @list.length @debug.println
+define isdigit
+{
+	create c
+	if { c '0' @gte c '9' @lte @logic.and } { true } else { false } 
+}
+
+define isalnum
+{
+	create c
+	if { c @isalpha c @isdigit @logic.or } { true } else { false }
+}
+
+@list.new create enemies_list
+
+0 create TOK_NUMBER
+1 create TOK_BOOLEAN
+2 create TOK_STRING
+3 create TOK_SYMBOL
+0 create token_number_value
+0 create token_string_value
+0 create token_type
+
+define read_token
+{
+	@strbuf.new create buffer
+	@getchar create c
+	while { c '\n' @equals @logic.not }
+	{
+		while { c @isspace }
+		{
+			@getchar set c
+		}
+		
+		if { c @isalpha c '_' @equals @logic.or }
+		{
+			buffer @strbuf.clear
+			while { c @isalnum }
+			{
+				buffer c @strbuf.char
+				@getchar set c
+			}
+			TOK_SYMBOL set token_type
+		}
+		else if { c '-' @equals c @isdigit @logic.or }
+		{
+			buffer @strbuf.clear
+			while { c @isdigit c '-' @equals @logic.or c '.' @equals @logic.or }
+			{
+				buffer c @strbuf.char
+				@getchar set c
+			}
+			buffer @strbuf.tostring @tonumber set token_number_value
+			TOK_NUMBER set token_type
+		}
+		else if { c == '"' }
+		{
+			buffer @strbuf.clear
+			@getchar set c
+			while { c '"' @equals @logic.not }
+			{
+				buffer c @strbuf.char
+				@getchar set c
+			}
+			@getchar set c
+			buffer @strbuf.tostring set token_string_value
+			TOK_STRING set token_type
+		}
+	}
+}
+
+define main
+{
+	@read_token
+	if { token_type TOK_NUMBER @equals } 
+	{	
+		token_number_value @debug.println 
+	}
+	else if { token_type TOK_STRING @equals }
+	{
+		token_string_value @debug.println
+	}
+}
+
+define list_test
+{
+	@list.new create list
+	
+	list 10 @list.append
+	list 20 @list.append
+	list 30 @list.append
+	list 40 @list.append
+	list 50 @list.append
+	
+	list @list.depend
+	list 20 0 @list.set
+	
+	list @list.length 1 @sub create i
+	while { i 0 @gte }
+	{
+		list i @list.get @io.putn
+		i 1 @sub set i
+	}
+}
+
+@hash.new create myhash
+
+myhash "test" 0 @hash.put
+myhash "test" @hash.get @io.putn
+'\n' @putchar
+myhash "test2" 1 @hash.put
+myhash "test2" @hash.get @io.putn
+'\n' @putchar
+

@@ -88,17 +88,17 @@ gexpr_t* gexpr_if()
 {
 	gread_token();
 	gexpr_t* cond = gexpr_block();
-	gexpr_t* true_block = gexpr_block();
+	gexpr_t* true_block = gexpression();
 	gexpr_t* false_block = NULL;
 	if(gtoken.type == TOK_ELSE)
 	{
 		gread_token();
-		false_block = gexpr_block();
+		false_block = gexpression();
 	}
 	gexpr_t* exp = gmake_expr(EXPR_IF);
 	exp->ifexpr.cond = cond;
-	exp->ifexpr.true_block = true_block;
-	exp->ifexpr.false_block = false_block;
+	exp->ifexpr.true_expr = true_block;
+	exp->ifexpr.false_expr = false_block;
 	return exp;
 }
 
@@ -232,9 +232,9 @@ void gdestroy_expr(gexpr_t* exp)
 		break;
 	case EXPR_IF:
 		gdestroy_expr(exp->ifexpr.cond);
-		gdestroy_expr(exp->ifexpr.true_block);
-		if(exp->ifexpr.false_block)
-			gdestroy_expr(exp->ifexpr.false_block);
+		gdestroy_expr(exp->ifexpr.true_expr);
+		if(exp->ifexpr.false_expr)
+			gdestroy_expr(exp->ifexpr.false_expr);
 		break;
 	case EXPR_BLOCK:
 		first = exp->blockexpr.block_head;
