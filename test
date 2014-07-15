@@ -1,0 +1,35 @@
+-1 create EOF
+define math.max
+{
+	create v2
+	create v1
+	
+	if { v1 v2 @gt } { v1 } 
+	if { v2 v1 @gt } { v2 }
+	if { v1 v2 @equals } { v1 }
+}
+
+define math.min
+{
+	create v2
+	create v1
+	
+	if { v1 v2 @lt } { v1 }
+	if { v2 v1 @lt } { v2 }
+	if { v1 v2 @equals } { v1 } 
+}
+
+define logic.and { if { @dup } { @drop if { @dup } { @drop true } } else { false } }
+define logic.or { if { @dup } { true } else { @drop if { @dup } { true } else { false } } }
+define logic.not { if { @dup } { false } else { true } }
+
+"file_open_test" "r" @file.open create file
+file @file.getchar create ch
+while { EOF ch @equals @logic.not }
+{
+	ch @putchar
+	file @file.getchar set ch
+}
+
+
+
