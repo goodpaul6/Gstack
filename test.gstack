@@ -23,13 +23,19 @@ define logic.and { if { @dup } { @drop if { @dup } { @drop true } } else { false
 define logic.or { if { @dup } { true } else { @drop if { @dup } { true } else { false } } }
 define logic.not { if { @dup } { false } else { true } }
 
-"file_open_test" "r" @file.open create file
-file @file.getchar create ch
-while { EOF ch @equals @logic.not }
+10 create i
+@list.new create list
+
+while { i } 
 {
-	ch @putchar
-	file @file.getchar set ch
+	list i @list.append
+	i 1 @sub set i
 }
 
+while { i 10 @lt }
+{
+	list i @list.get @debug.println
+	i 1 @add set i
+}
 
-
+list @list.length @debug.println

@@ -148,6 +148,7 @@ void gpush_string(struct gstate* state, char* value, long length);
 void gpush_pair(struct gstate* state);
 void gpush_native(struct gstate* state, void* value, void (*on_mark)(void** val), void (*on_unmark)(void** val), void (*on_gc)(void** val));
 
+void gmark_object(gobject_t* obj);
 void gcollect_garbage(struct gstate* state);
 
 typedef struct gprimitive

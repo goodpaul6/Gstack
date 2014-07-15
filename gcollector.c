@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include "gstack.h"
 
-static void mark_object(gobject_t* obj)
+void gmark_object(gobject_t* obj)
 {
 	if(!obj) return;
 	if(obj->marked) return;
@@ -11,8 +11,8 @@ static void mark_object(gobject_t* obj)
 	
 	if(obj->type == OBJ_PAIR)
 	{
-		mark_object(obj->pair.head);
-		mark_object(obj->pair.tail);
+		gmark_object(obj->pair.head);
+		gmark_object(obj->pair.tail);
 	}
 	
 	if(obj->type == OBJ_NATIVE)
@@ -25,13 +25,13 @@ static void mark_object(gobject_t* obj)
 static void mark_symbol(gsymbol_t* sym)
 {
 	if(!sym) return;
-	mark_object(sym->value);
+	gmark_object(sym->value);
 }
 
 static void mark_all(gstate_t* state)
 {
 	long i; for(i = 0; i < state->stack_size; i++)
-		mark_object(state->stack[i]);
+		gmark_object(state->stack[i]);
 	
 	long symstack_size = state->symbols_stack_size;
 	while(symstack_size >= 0)

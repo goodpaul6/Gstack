@@ -209,6 +209,80 @@ void file_getchar_prim(gstate_t* state)
 	gpush_number(state, fgetc(nfile));
 }
 
+typedef struct nat_list
+{
+	size_t capacity;
+	size_t length;
+	gobject_t** items;
+} nat_list_t;
+
+static void list_realloc(nat_list_t* list)
+{
+	gobject_t** new_items = realloc(list->items, list->capacity * sizeof(gobject_t*));
+	if(!new_items) gfatal_error("out of memory\n");
+	list->items = new_items;
+}
+
+void list_on_mark(void** value)
+{
+	nat_list_t* list = (nat_list_t*)(*value);
+	size_t i; for (i = 0; i < list->length; i++)
+		gmark_object(list->items[i]);
+}
+
+void list_on_gc(void** value)
+{
+	nat_list_t* list = (nat_list_t*)(*value);
+	free(list->items);
+	free(list);
+	*value = NULL;
+}
+
+void list_create_prim(gstate_t* state)
+{
+	nat_list_t* list = malloc(sizeof(nat_list_t));
+	if(!list) gfatal_error("out of memory\n");
+	list->capacity = 2;
+	list->length = 0;
+	list->items = NULL;
+	list_realloc(list);
+	gpush_native(state, list, list_on_mark, NULL, list_on_gc);
+}
+
+void list_append_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_object(state);
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	list->length += 1;
+	if(list->length == list->capacity) 
+	{
+		list->capacity *= 2;
+		list_realloc(list);
+	}
+	list->items[list->length - 1] = obj;
+}
+
+void list_get_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	if((int)obj->number.value >= list->length) gfatal_error("list index is out of bounds (%ld)\n", (long)obj->number.value); 
+	gpush_object(state, list->items[(int)obj->number.value]);
+}
+
+void list_depend_prim(gstate_t* state)
+{
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	if(list->length == 0) gfatal_error("cannot depend from empty list\n");
+	--list->length;
+}
+
+void list_length_prim(gstate_t* state)
+{
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);	
+	gpush_number(state, list->length);
+}
+
 static gprimitivereg_t standard_library[] =
 {
 	{"add", add_prim},
@@ -235,6 +309,11 @@ static gprimitivereg_t standard_library[] =
 	{"mod", mod_prim},
 	{"file.open", file_open_prim},
 	{"file.getchar", file_getchar_prim},
+	{"list.new", list_create_prim},
+	{"list.get", list_get_prim},
+	{"list.append", list_append_prim},
+	{"list.depend", list_depend_prim},
+	{"list.length", list_length_prim},
 	{"", NULL}
 };
 
