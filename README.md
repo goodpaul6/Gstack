@@ -66,8 +66,10 @@ output:
 Arithmetic is done through calls to the native functions:
 @add, @sub, @mul, @div, @mod
 
-The standard library will soon be documented, but currently, there are 3 native data structures for use within the language:
-Lists, Hash Tables, and String Buffers.
+The standard library will soon be fully documented.
+
+Currently, there are 4 native data structures for use within the language:
+Lists, Hash Tables, String Buffers, and Closures
 
 Lists:
 
@@ -95,32 +97,26 @@ mybuffer @strbuf.tostring @io.puts		# will convert the data in the buffer to a s
 mybuffer @strbuf.clear					# will clear the buffer
 mybuffer 10 @tostring @strbuf.str		# will append the number 10 as a string to the buffer
 
+10 create val1
+{
+	0 create val2
+	@closure.new create myclosure 			# will create a native closure object and bind it to the variable 'myclosure'
+	myclosure @closure.capture				# will copy all variables in the environment and store them in the closure
+	myclosure								# pass it on to the stack 
+}
+create myclosure							# store the closure in the variable myclosure
+
+# this closure object can now be passed around as data and will keep all objects (at the 
+# moment capture was called) alive and accessible.
+
+myclosure "val2" @closure.get				# normally, val2 would have been lost, but the closure preserved it, and its value
+myclosure "val2" 20 @closure.set			# you can set values in a closure as well 
+
 # there is no need to free the list or anything else as the garbage collector will notify the native object 
 # when it is no longer in use (and thus can be freed). 
 ```
 The dot (.) syntax in Gstack has no semantic meaning, and is used for aesthetic purposes.
 
-You may notice that there is no built in implementation of logical operators, but these can be implemented by you in the language:
-
-
-```
-define logical.and		# pops 2 values off the stack and returns pushes true onto the stack if both values are true	
-{
-	if { @dup } 		# 'dup' duplicates the value on top of the stack. The if statement's condition block's value is popped off the stack (in this case, that is the duplicate value)
-	{
-		@drop			# 'drop' removes the value on top of the stack
-		if { @dup } 	# if the second value evaluates to true
-		{
-			@drop
-			true		
-		}
-		else 		
-			false		# if no braces are present, only the expression directly after the if is evaluated
-	}
-	else
-		false
-}
-```
 
 TO BE EXPANDED...
 
