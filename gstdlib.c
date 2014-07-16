@@ -87,7 +87,8 @@ void drop_prim(gstate_t* state)
 
 static char are_objects_equal(gobject_t* o1, gobject_t* o2)
 {
-	if(o1->type != o2->type) gfatal_error("attempted to compare equality between 2 objects of different types (%i and %i)\n", o1->type, o2->type);
+	if(o1->type != o2->type) return 0;
+	
 	switch(o1->type)
 	{
 	case OBJ_NUMBER:
@@ -102,6 +103,16 @@ static char are_objects_equal(gobject_t* o1, gobject_t* o2)
 		return o1->native.value == o2->native.value;
 	}
 	return 0;
+}
+
+void exit_prim(gstate_t* state)
+{	
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	int v = (int)obj->number.value;
+	
+	gfile_unload(state);
+	gdestroy_state(state);
+	exit(v);
 }
 
 void equals_prim(gstate_t* state)
@@ -320,7 +331,7 @@ void list_clear_prim(gstate_t* state)
 void io_puts_prim(gstate_t* state)
 {
 	gobject_t* obj = gpop_expect(state, OBJ_STRING);
-	if(!puts(obj->string.value)) gfatal_error("io.puts failed\n");
+	if(!printf("%s", obj->string.value)) gfatal_error("io.puts failed\n");
 }
 
 void io_putn_prim(gstate_t* state)
@@ -333,7 +344,7 @@ void io_putnp_prim(gstate_t* state)
 {
 	gobject_t* prec = gpop_expect(state, OBJ_NUMBER);
 	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
-	if(!printf("%.*f", prec->number.value, obj->number.value)) gfatal_error("io.putnp failed\n");
+	if(!printf("%.*f", (int)prec->number.value, obj->number.value)) gfatal_error("io.putnp failed\n");
 }
 
 void io_putb_prim(gstate_t* state)
@@ -640,6 +651,245 @@ void tostring_prim(gstate_t* state)
 	gpush_string(state, buffer, length, 0);
 }
 
+static char is_true(gobject_t* obj)
+{
+	if(obj->type == OBJ_NUMBER)
+		return (obj->number.value != 0);
+	if(obj->type == OBJ_BOOLEAN)
+		return obj->boolean.value;
+	return 1;
+}
+
+void and_prim(gstate_t* state)
+{
+	gobject_t* b2 = gpop_object(state);
+	gobject_t* b1 = gpop_object(state);
+	
+	char val = is_true(b1) && is_true(b2);
+	
+	gpush_boolean(state, val);
+}
+
+void or_prim(gstate_t* state)
+{
+	gobject_t* b2 = gpop_object(state);
+	gobject_t* b1 = gpop_object(state);
+	
+	char val = is_true(b1) || is_true(b2);
+	
+	gpush_boolean(state, val);
+}
+
+void not_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_object(state);
+	gpush_boolean(state, !is_true(obj));
+}
+
+void bitwise_and_prim(gstate_t* state)
+{
+	gobject_t* sh = gpop_expect(state, OBJ_NUMBER);
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	
+	unsigned long v1 = (unsigned long)obj->number.value;
+	unsigned long v2 = (unsigned long)sh->number.value;
+	
+	gpush_number(state, v1 & v2);
+}
+
+void bitwise_or_prim(gstate_t* state)
+{
+	gobject_t* sh = gpop_expect(state, OBJ_NUMBER);
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	
+	unsigned long v1 = (unsigned long)obj->number.value;
+	unsigned long v2 = (unsigned long)sh->number.value;
+	
+	gpush_number(state, v1 | v2);
+}
+
+void bitwise_shift_left(gstate_t* state)
+{
+	gobject_t* sh = gpop_expect(state, OBJ_NUMBER);
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	
+	unsigned long v1 = (unsigned long)obj->number.value;
+	unsigned long v2 = (unsigned long)sh->number.value;
+	
+	gpush_number(state, v1 << v2);
+}
+
+
+void bitwise_shift_right(gstate_t* state)
+{
+	gobject_t* sh = gpop_expect(state, OBJ_NUMBER);
+	gobject_t* obj = gpop_expect(state, OBJ_NUMBER);
+	
+	unsigned long v1 = (unsigned long)obj->number.value;
+	unsigned long v2 = (unsigned long)sh->number.value;
+	
+	gpush_number(state, v1 >> v2);
+}
+
+void call_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_STRING);
+	gcall_function(state, obj->string.value);
+}
+
+void type_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_object(state);
+	gpush_number(state, obj->type);
+}
+
+typedef struct nat_closure
+{
+	gsymbol_t* symbols_stack[MAX_STACK_LEN];
+	long symbols_stack_size;
+} nat_closure_t;
+
+static void mark_all_symbols(gsymbol_t* sym)
+{
+	while(sym)
+	{
+		gsymbol_mark(sym);
+		sym = sym->next;
+	}
+}
+
+static void closure_clear(nat_closure_t* clos)
+{	
+	long size = clos->symbols_stack_size;
+	
+	while(size >= 0)
+	{
+		gsymbol_t* next;
+		gsymbol_t* sym; for(sym = clos->symbols_stack[size]; sym != NULL; sym = next)
+		{
+			next = sym->next;
+			free(sym->name);
+			free(sym);
+		}
+		--size;
+	}
+	
+	clos->symbols_stack_size = 0;
+	clos->symbols_stack[0] = NULL;
+}
+
+void closure_on_gc(void** value)
+{
+	nat_closure_t* clos = (nat_closure_t*)(*value);
+	closure_clear(clos);
+	free(clos);
+	*value = NULL;
+}
+
+void closure_on_mark(void** value)
+{
+	nat_closure_t* clos = (nat_closure_t*)(*value);
+	long size = clos->symbols_stack_size;
+	
+	while(size >= 0)
+	{
+		mark_all_symbols(clos->symbols_stack[size]);
+		--size;
+	}
+}
+
+void closure_create_prim(gstate_t* state)
+{
+	nat_closure_t* clos = calloc(1, sizeof(nat_closure_t));
+	if(!clos) gfatal_error("out of memory\n");
+	clos->symbols_stack_size = 0;
+	clos->symbols_stack[0] = NULL;
+	gpush_native(state, clos, closure_on_mark, NULL, closure_on_gc);
+}
+
+void closure_capture_prim(gstate_t* state)
+{
+	nat_closure_t* clos = (nat_closure_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	closure_clear(clos);
+	
+	clos->symbols_stack_size = state->symbols_stack_size;
+	
+	long pos = 0;
+	while(pos <= state->symbols_stack_size)
+	{
+		gsymbol_t* sym = state->symbols_stack[pos];
+		gsymbol_t* clos_sym = NULL;
+		while(sym)
+		{
+			clos_sym = malloc(sizeof(gsymbol_t));
+			if(!clos_sym) gfatal_error("out of memory\n");
+			
+			clos_sym->next = clos->symbols_stack[pos];
+			clos->symbols_stack[pos] = clos_sym;
+			
+			clos_sym->name = strdup(sym->name);
+			if(!clos_sym->name) gfatal_error("out of memory\n");
+			clos_sym->value = sym->value;
+			
+			sym = sym->next;
+		}
+		++pos;
+	}
+}
+
+static gsymbol_t* closure_get_sym(nat_closure_t* clos, const char* name)
+{
+	long size = clos->symbols_stack_size;
+	
+	while(size >= 0)
+	{
+		gsymbol_t* sym = clos->symbols_stack[size];
+		while(sym)
+		{
+			if(strcmp(sym->name, name) == 0)
+				return sym;
+			sym = sym->next;
+		}
+		--size;
+	}
+	gfatal_error("attempted to get non-existent symbol from closure object (%s)\n", name);
+	return NULL;
+}
+
+void closure_get_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_STRING);
+	nat_closure_t* clos = (nat_closure_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	
+	gsymbol_t* sym = closure_get_sym(clos, obj->string.value);
+	gpush_object(state, sym->value);
+}
+
+void closure_set_prim(gstate_t* state)
+{
+	gobject_t* new_val = gpop_object(state);
+	gobject_t* obj = gpop_expect(state, OBJ_STRING);
+	nat_closure_t* clos = (nat_closure_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	
+	gsymbol_t* sym = closure_get_sym(clos, obj->string.value);
+	sym->value = new_val;
+}
+
+void newline_prim(gstate_t* state)
+{
+	if(!putchar('\n')) gfatal_error("newline failed\n");
+}
+
+void srand_prim(gstate_t* state)
+{
+	srand(time(NULL));
+}
+
+void rand_prim(gstate_t* state)
+{
+	gpush_number(state, (float)rand() / (float)RAND_MAX); 
+}
+
 static gprimitivereg_t standard_library[] =
 {
 	{"add", add_prim},
@@ -651,6 +901,7 @@ static gprimitivereg_t standard_library[] =
 	{"putchar", putchar_prim},
 	{"dup", dup_prim},
 	{"drop", drop_prim},
+	{"exit", exit_prim},
 	{"equals", equals_prim},
 	{"head", head_prim},
 	{"tail", tail_prim},
@@ -692,11 +943,32 @@ static gprimitivereg_t standard_library[] =
 	{"hash.set", hash_table_set_prim},
 	{"hash.remove", hash_table_remove_prim},
 	{"tonumber", tonumber_prim},
-	{"tostring", tostring_prim}, 
+	{"tostring", tostring_prim},
+	{"and", and_prim},
+	{"or", or_prim},
+	{"not", not_prim},
+	{"bit.and", bitwise_and_prim},
+	{"bit.or", bitwise_or_prim},
+	{"bit.asl", bitwise_shift_left},
+	{"bit.asr", bitwise_shift_right}, 
+	{"call", call_prim},
+	{"typeof", type_prim},
+	{"closure.new", closure_create_prim},
+	{"closure.capture", closure_capture_prim},
+	{"closure.get", closure_get_prim},
+	{"closure.set", closure_set_prim},
+	{"newline", newline_prim},
+	{"random.seed", srand_prim},
+	{"random.float", rand_prim},
 	{"", NULL}
 };
 
 void gload_stdlib(gstate_t* state)
 {
 	gadd_primitivelib(state, standard_library);
+	GUTIL_ADDCONST(state, "number", OBJ_NUMBER);
+	GUTIL_ADDCONST(state, "boolean", OBJ_BOOLEAN);
+	GUTIL_ADDCONST(state, "string", OBJ_STRING);
+	GUTIL_ADDCONST(state, "pair", OBJ_PAIR);
+	GUTIL_ADDCONST(state, "native", OBJ_NATIVE);
 }

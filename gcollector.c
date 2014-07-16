@@ -22,7 +22,7 @@ void gmark_object(gobject_t* obj)
 	}
 }
 
-static void mark_symbol(gsymbol_t* sym)
+void gsymbol_mark(gsymbol_t* sym)
 {
 	if(!sym) return;
 	gmark_object(sym->value);
@@ -38,7 +38,7 @@ static void mark_all(gstate_t* state)
 	{
 		gsymbol_t* sym;
 		for(sym = state->symbols_stack[symstack_size]; sym != NULL; sym = sym->next)
-			mark_symbol(sym);
+			gsymbol_mark(sym);
 		--symstack_size;
 	}
 }

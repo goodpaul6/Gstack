@@ -8,6 +8,15 @@
 #define	MAX_STACK_LEN		1024
 #define INITIAL_GC_THRES	8
 
+#define GUTIL_ADDCONST(state, name, value)	\
+do   								\
+{ 									\
+	gsymbol_t* sym = gsymbol_create(state, name); \
+	gpush_number(state, value);							\
+	gsymbol_setval(sym, gpop_object(state));	\
+} while (0)							\
+
+
 void gfatal_error(const char* format, ...);
 
 typedef enum
@@ -83,6 +92,7 @@ typedef struct gexpr
 		struct { char* name; } setexpr;
 		struct { char* name; } createexpr;
 		struct { struct gexpr* head; struct gexpr* tail; } pairexpr;
+		struct { char* name; } defrefexpr;
 	};
 } gexpr_t;
 
@@ -193,12 +203,16 @@ void gfile_unload(gstate_t* state);
 void gsymbol_push(gstate_t* state);
 gsymbol_t* gsymbol_get(gstate_t* state, char* name);
 gsymbol_t* gsymbol_create(gstate_t* state, char* name);
+void gsymbol_mark(gsymbol_t* sym);
+void gsymbol_setval(gsymbol_t* sym, gobject_t* value);
 void gadd_primitive(gstate_t* state, const char* name, void (*fn)(struct gstate*));
 void gadd_primitivelib(gstate_t* state, gprimitivereg_t prims[]);
 gprimitive_t* gprimitive_get(gstate_t* state, const char* name);
 gexpr_t* gdefine_get(gstate_t* state, const char* name);
 void gsymbol_pop(gstate_t* state);
 
+void gcall_function(gstate_t* state, const char* name);
+void gnode_do(gstate_t* state, gexpr_t* node);
 void gexecute_program(gstate_t* state);
 
 void gload_stdlib(gstate_t* state);

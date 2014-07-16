@@ -40,6 +40,13 @@ static int escape_seq(char c)
 	return 0;
 }
 
+static int peek(FILE* in)
+{
+	int c = fgetc(in);
+	ungetc(c, in);
+	return c;
+}
+
 void gread_token()
 {
 	FILE* in = ginput_stream;
@@ -86,6 +93,24 @@ void gread_token()
 			gtoken.type = TOK_SET;
 		if(strcmp(gtoken.buffer, "create") == 0)
 			gtoken.type = TOK_CREATE;
+	}
+	else if(c == '0' && peek(in) == 'x')
+	{
+		i = 0;
+		c = fgetc(in);
+		c = fgetc(in);
+		while(isxdigit(c))
+		{
+			if(i < MAX_TOKEN_LEN - 1)
+				gtoken.buffer[i++] = c;
+			else
+				gfatal_error("hexadecimal digit length is greater than maximum token length\n");
+			c = fgetc(in);
+		}
+		ungetc(c, in);
+		gtoken.buffer[i] = '\0';
+		gtoken.type = TOK_NUMBER;
+		gtoken.number = strtol(gtoken.buffer, NULL, 16);
 	}
 	else if(c == '(')
 		gtoken.type = TOK_OPENPAIR;

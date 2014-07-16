@@ -131,6 +131,27 @@ gprimitive_t* gprimitive_get(gstate_t* state, const char* name)
 	return NULL;
 }
 
+static gexpr_t* find_define_in_block(gexpr_t* exp, const char* name)
+{
+	gexpr_t* node = exp->blockexpr.block_head;
+	
+	while(node)
+	{
+		if(node->type == EXPR_DEFINE)
+		{
+			if(strcmp(node->defexpr.name, name) == 0)
+				return node;
+				
+			gexpr_t* in_block = find_define_in_block(node->defexpr.block, name);
+			if(in_block)
+				return in_block;
+		}
+		node = node->next;
+	}
+	
+	return NULL;
+}
+
 gexpr_t* gdefine_get(gstate_t* state, const char* name)
 {
 	gexpr_t* prog_node = state->program_head;
@@ -140,10 +161,19 @@ gexpr_t* gdefine_get(gstate_t* state, const char* name)
 		{
 			if(strcmp(prog_node->defexpr.name, name) == 0)
 				return prog_node;
+			
+			gexpr_t* in_block = find_define_in_block(prog_node->defexpr.block, name);
+			if(in_block)
+				return in_block;
 		}
 		prog_node = prog_node->next;
 	}
 	return NULL;
+}
+
+void gsymbol_setval(gsymbol_t* sym, gobject_t* value)
+{
+	sym->value = value;
 }
 
 void gsymbol_push(gstate_t* state)
@@ -165,3 +195,4 @@ void gsymbol_pop(gstate_t* state)
 	}
 	--state->symbols_stack_size;
 }
+
