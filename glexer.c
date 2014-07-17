@@ -112,6 +112,10 @@ void gread_token()
 		gtoken.type = TOK_NUMBER;
 		gtoken.number = strtol(gtoken.buffer, NULL, 16);
 	}
+	else if(c == '[')
+		gtoken.type = TOK_OPENLIST;
+	else if(c == ']')
+		gtoken.type = TOK_CLOSELIST;
 	else if(c == '(')
 		gtoken.type = TOK_OPENPAIR;
 	else if(c == ')')

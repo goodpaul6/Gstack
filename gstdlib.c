@@ -1,6 +1,7 @@
 /* -- gstdlib.c -- a stack based programming language */
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "gstack.h"
 
 #define HASH_TABLE_ENTRIES_AMT		2048
@@ -263,6 +264,46 @@ void list_create_prim(gstate_t* state)
 	gpush_native(state, list, list_on_mark, NULL, list_on_gc);
 }
 
+static void list_extend(nat_list_t* list);
+
+static void list_reverse(nat_list_t* list)
+{
+	size_t i; for(i = 0; i < list->length / 2; i++)
+	{
+		gobject_t* temp = list->items[i];
+		list->items[i] = list->items[list->length - i - 1];
+		list->items[list->length - i - 1] = temp;
+	}
+}
+
+static void list_additem(nat_list_t* list, gobject_t* obj)
+{
+	list->length += 1;
+	list_extend(list);
+	list->items[list->length - 1] = obj;
+}
+
+void list_createblock_prim(gstate_t* state)
+{
+	gobject_t* size = gpop_expect(state, OBJ_NUMBER);
+	nat_list_t* list = malloc(sizeof(nat_list_t));
+	if(!list) gfatal_error("out of memory\n");
+	size_t amt = (size_t)size->number.value;
+	list->capacity = amt * 2;
+	list->length = amt;
+	list->items = NULL;
+	list_realloc(list);
+	size_t i; for(i = 0; i < amt; i++)
+		list->items[amt - i - 1] = gpop_object(state);
+	gpush_native(state, list, list_on_mark, NULL, list_on_gc);
+}
+
+void list_reverse_prim(gstate_t* state)
+{
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
+	list_reverse(list);
+}
+
 static void list_extend(nat_list_t* list)
 {
 	while(list->length >= list->capacity) 
@@ -276,9 +317,7 @@ void list_append_prim(gstate_t* state)
 {
 	gobject_t* obj = gpop_object(state);
 	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);
-	list->length += 1;
-	list_extend(list);
-	list->items[list->length - 1] = obj;
+	list_additem(list, obj);	
 }
 
 void list_get_prim(gstate_t* state)
@@ -310,6 +349,34 @@ void list_length_prim(gstate_t* state)
 {
 	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);	
 	gpush_number(state, list->length);
+}
+
+static void list_remove_idx(nat_list_t* list, long idx)
+{
+	if(idx >= list->length) gfatal_error("attempted to remove object from non-existent index in list (%ld)\n", idx);
+	if(idx == list->length - 1) 
+	{
+		list->length -= 1;
+		return;
+	}
+
+	memmove(list->items + idx, list->items + (idx + 1), sizeof(gobject_t*) * (list->length - idx - 1));
+	list->length -= 1;
+}
+
+void list_remove_prim(gstate_t* state)
+{ 
+	gobject_t* obj = gpop_object(state);
+	nat_list_t* list = (nat_list_t*)(gpop_expect(state, OBJ_NATIVE)->native.value);	
+	long i; for(i = 0; i < list->length; i++)
+	{
+		if(list->items[i] == obj)
+		{
+			list_remove_idx(list, i);
+			return;
+		}
+	}
+	gfatal_error("could not find object in list, removal failed\n");
 }
 
 void list_resize_prim(gstate_t* state)
@@ -918,6 +985,8 @@ static gprimitivereg_t standard_library[] =
 	{"file.open", file_open_prim},
 	{"file.getchar", file_getchar_prim},
 	{"list.new", list_create_prim},
+	{"list.newblock", list_createblock_prim},
+	{"list.reverse", list_reverse_prim},
 	{"list.get", list_get_prim},
 	{"list.append", list_append_prim},
 	{"list.depend", list_depend_prim},
@@ -925,6 +994,7 @@ static gprimitivereg_t standard_library[] =
 	{"list.set", list_set_prim},
 	{"list.resize", list_resize_prim},
 	{"list.clear", list_clear_prim},
+	{"list.remove", list_remove_prim},
 	{"io.puts", io_puts_prim},
 	{"io.putn", io_putn_prim},
 	{"io.putnp", io_putnp_prim}, 

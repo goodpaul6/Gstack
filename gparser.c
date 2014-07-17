@@ -166,6 +166,30 @@ gexpr_t* gexpr_pair()
 	return exp;
 }
 
+gexpr_t* gexpr_list()
+{
+	gread_token();
+	gexpr_t* exp = gmake_expr(EXPR_LIST);
+	if(gtoken.type == TOK_CLOSELIST)
+	{
+		exp->listexpr.exprs_head = NULL;
+		gread_token();
+		return exp;
+	}
+	gexpr_t* expr_head = gexpression();
+	gexpr_t* last = expr_head;
+	while(gtoken.type != TOK_CLOSELIST)
+	{
+		gexpr_t* lexp = gexpression();
+		last->next = lexp;
+		last = lexp;
+	}
+	last->next = NULL;
+	gread_token();
+	exp->listexpr.exprs_head = expr_head;
+	return exp;
+}
+
 gexpr_t* gexpression()
 {
 	switch(gtoken.type)
@@ -194,6 +218,8 @@ gexpr_t* gexpression()
 		return gexpr_create();
 	case TOK_OPENPAIR:
 		return gexpr_pair();
+	case TOK_OPENLIST:
+		return gexpr_list();
 	case TOK_EOF:
 		return NULL;
 	default:
@@ -238,6 +264,15 @@ void gdestroy_expr(gexpr_t* exp)
 		break;
 	case EXPR_BLOCK:
 		first = exp->blockexpr.block_head;
+		while(first != NULL)
+		{
+			gexpr_t* next = first->next;
+			gdestroy_expr(first);
+			first = next;
+		}
+		break;
+	case EXPR_LIST:
+		first = exp->listexpr.exprs_head;
 		while(first != NULL)
 		{
 			gexpr_t* next = first->next;

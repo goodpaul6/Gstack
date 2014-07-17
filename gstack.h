@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #define MAX_TOKEN_LEN		1024
-#define	MAX_STACK_LEN		1024
+#define	MAX_STACK_LEN		9000
 #define INITIAL_GC_THRES	8
 
 #define GUTIL_ADDCONST(state, name, value)	\
@@ -15,7 +15,6 @@ do   								\
 	gpush_number(state, value);							\
 	gsymbol_setval(sym, gpop_object(state));	\
 } while (0)							\
-
 
 void gfatal_error(const char* format, ...);
 
@@ -34,6 +33,8 @@ typedef enum
 	TOK_CLOSEBLOCK,
 	TOK_OPENPAIR,
 	TOK_CLOSEPAIR,
+	TOK_OPENLIST,
+	TOK_CLOSELIST,
 	TOK_SET,
 	TOK_CREATE,
 	TOK_EOF
@@ -71,6 +72,7 @@ typedef enum
 	EXPR_BLOCK,
 	EXPR_SET,
 	EXPR_CREATE,
+	EXPR_LIST,
 } gexpr_type_t;
 
 typedef struct gexpr
@@ -93,6 +95,7 @@ typedef struct gexpr
 		struct { char* name; } createexpr;
 		struct { struct gexpr* head; struct gexpr* tail; } pairexpr;
 		struct { char* name; } defrefexpr;
+		struct { struct gexpr* exprs_head; } listexpr;
 	};
 } gexpr_t;
 
@@ -110,6 +113,7 @@ gexpr_t* gexpr_if();
 gexpr_t* gexpr_block();
 gexpr_t* gexpr_set();
 gexpr_t* gexpr_create();
+gexpr_t* gexpr_list();
 
 gexpr_t* gexpression();
 

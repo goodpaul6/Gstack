@@ -19,6 +19,7 @@ void gnode_do(gstate_t* state, gexpr_t* exp)
 {
 	gsymbol_t* sym;
 	gexpr_t* node;
+	size_t count = 0;
 	switch(exp->type)
 	{
 	case EXPR_NUMBER:
@@ -77,12 +78,22 @@ void gnode_do(gstate_t* state, gexpr_t* exp)
 	case EXPR_BLOCK:
 		gsymbol_push(state);
 		node = exp->blockexpr.block_head;
-		while(node != NULL)
+		while(node)
 		{	
 			gnode_do(state, node);
 			node = node->next;
 		}
 		gsymbol_pop(state);
+		break;
+	case EXPR_LIST:
+		node = exp->listexpr.exprs_head;
+		while(node)
+		{
+			++count;
+			gnode_do(state, node);
+			node = node->next;
+		}
+		gpush_number(state, count);
 		break;
 	case EXPR_SET:
 		sym = gsymbol_get(state, exp->setexpr.name);
