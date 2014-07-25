@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #define MAX_TOKEN_LEN		1024
-#define	MAX_STACK_LEN		9000
+#define	MAX_STACK_LEN		4096
 #define INITIAL_GC_THRES	8
 
 #define GUTIL_ADDCONST(state, name, value)\
@@ -66,9 +66,13 @@ typedef enum
 
 FILE* ginput_stream;
 
+size_t gerrlineno;
+const char* gerrfilename;
+
 struct
 {
 	gtoken_type_t type;
+	size_t lineno;
 	char buffer[MAX_TOKEN_LEN];
 	long length;
 	
@@ -103,7 +107,8 @@ typedef struct gexpr
 {
 	gexpr_type_t type;
 	struct gexpr* next;
-	
+	size_t lineno;
+
 	union
 	{
 		struct { float value; } numexpr;
@@ -225,6 +230,7 @@ typedef struct gstate
 gstate_t* gmake_state();
 void gdestroy_state(gstate_t* state);
 
+void gfile_append_to_top(gstate_t* state, FILE* in);
 void gfile_load(gstate_t* state, FILE* in);
 void gfile_unload(gstate_t* state);
 

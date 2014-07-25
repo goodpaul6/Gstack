@@ -41,9 +41,31 @@ void gdestroy_state(gstate_t* state)
 	free(state);
 }
 
+void gfile_append_to_top(gstate_t* state, FILE* in)
+{
+	FILE* inp = ginput_stream;
+	ginput_stream = in;
+	gread_token();
+	gexpr_t* head = gexpression();
+	gexpr_t* last = head;
+	while(last != NULL)
+	{
+		gexpr_t* exp = gexpression();
+		last->next = exp;
+		last = exp;
+	}
+	last->next = NULL;
+	gexpr_t* program_head = state->program_head;
+	state->program_head = head;
+	gexecute_program(state);
+	last->next = program_head;
+	ginput_stream = inp;
+}
+
 void gfile_load(gstate_t* state, FILE* in)
 {
 	ginput_stream = in;
+	gtoken.lineno = 1;
 	gread_token();
 	state->program_head = gexpression();
 	gexpr_t* last = state->program_head;

@@ -29,7 +29,7 @@ void gdestroy_object(gobject_t* obj)
 
 void gpush_object(gstate_t* state, gobject_t* obj)
 {
-	if(state->stack_size == MAX_STACK_LEN) gfatal_error("stack overflow\n");
+	if(state->stack_size == MAX_STACK_LEN) gfatal_error("stack overflow at size %ld\n", (long)MAX_STACK_LEN);
 	state->stack[state->stack_size++] = obj;
 }
 

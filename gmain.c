@@ -8,6 +8,7 @@ int main(int argc, char* argv[])
 		FILE* file = fopen(argv[1], "r");
 		if(!file) gfatal_error("invalid input file! (%s)\n", argv[1]);
 		gstate_t* state = gmake_state();
+		gerrfilename = argv[1];
 		gfile_load(state, file);
 		gload_stdlib(state);
 		gexecute_program(state);

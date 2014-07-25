@@ -5,7 +5,7 @@
 
 void gfatal_error(const char* format, ...)
 {
-	fprintf(stderr, "FATAL ERROR:\n");
+	fprintf(stderr, "FATAL ERROR at line %ld in file '%s':\n", (long)gerrlineno, gerrfilename);
 	va_list args;
 	va_start (args, format);
 	vfprintf (stderr, format, args);

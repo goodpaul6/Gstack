@@ -16,6 +16,7 @@ gexpr_t* gmake_expr(gexpr_type_t type)
 		gfatal_error("out of memory\n");
 	exp->type = type;
 	exp->next = NULL;
+	exp->lineno = gtoken.lineno;
 	return exp;
 }
 

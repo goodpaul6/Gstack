@@ -17,6 +17,7 @@ static char is_true(gobject_t* obj)
 
 void gnode_do(gstate_t* state, gexpr_t* exp)
 {
+	gerrlineno = exp->lineno;
 	gsymbol_t* sym;
 	gexpr_t* node;
 	size_t count = 0;
@@ -127,7 +128,7 @@ void gcall_function(gstate_t* state, const char* name)
 		prim->fn(state);
 		return;
 	}
-	gfatal_error("attempted to call non-existent function/define (%s)\n", name);
+	gfatal_error("attempted to call non-existent function/define ('%s')\n", name);
 }
 
 void gexecute_program(gstate_t* state)

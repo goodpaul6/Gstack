@@ -12,7 +12,10 @@ static void geat_whitespace(FILE* in)
 	if(isspace(c))
 	{
 		while(isspace(c))
+		{	
+			if(c == '\n') ++gtoken.lineno;
 			c = fgetc(in);
+		}
 	}
 	
 	if(c != EOF)
@@ -36,7 +39,7 @@ static int escape_seq(char c)
 		case '\\':
 			return '\\';
 	}
-	gfatal_error("invalid escape sequence ('\%c')\n", c);
+	gfatal_error("invalid escape sequence ('\\%c')\n", c);
 	return 0;
 }
 
@@ -209,6 +212,7 @@ void gread_token()
 	}
 	
 	gtoken.length = i;
+	gerrlineno = gtoken.lineno;
 }
 
 void gpeek_token()

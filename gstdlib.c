@@ -957,6 +957,18 @@ void rand_prim(gstate_t* state)
 	gpush_number(state, (float)rand() / (float)RAND_MAX); 
 }
 
+void dofile_prim(gstate_t* state)
+{
+	gobject_t* obj = gpop_expect(state, OBJ_STRING);
+	FILE* file = fopen(obj->string.value, "r");
+	if(!file) gfatal_error("attempted to open file with name %s, failed\n", obj->string.value);
+	const char* prev_errfile = gerrfilename;
+	gerrfilename = obj->string.value;
+	gfile_append_to_top(state, file);
+	gerrfilename = prev_errfile;
+	fclose(file);
+}
+
 static gprimitivereg_t standard_library[] =
 {
 	{"add", add_prim},
@@ -1030,6 +1042,7 @@ static gprimitivereg_t standard_library[] =
 	{"newline", newline_prim},
 	{"random.seed", srand_prim},
 	{"random.float", rand_prim},
+	{"dofile", dofile_prim},
 	{"", NULL}
 };
 
