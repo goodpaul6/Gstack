@@ -48,17 +48,18 @@ void gfile_append_to_top(gstate_t* state, FILE* in)
 	gread_token();
 	gexpr_t* head = gexpression();
 	gexpr_t* last = head;
+	gexpr_t* tail = NULL;
 	while(last != NULL)
 	{
 		gexpr_t* exp = gexpression();
 		last->next = exp;
+		if(last->next == NULL) tail = last;
 		last = exp;
 	}
-	last->next = NULL;
 	gexpr_t* program_head = state->program_head;
 	state->program_head = head;
 	gexecute_program(state);
-	last->next = program_head;
+	tail->next = program_head;
 	ginput_stream = inp;
 }
 
