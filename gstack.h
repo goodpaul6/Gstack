@@ -8,13 +8,37 @@
 #define	MAX_STACK_LEN		9000
 #define INITIAL_GC_THRES	8
 
-#define GUTIL_ADDCONST(state, name, value)	\
+#define GUTIL_ADDCONST(state, name, value)\
 do   								\
 { 									\
 	gsymbol_t* sym = gsymbol_create(state, name); \
 	gpush_number(state, value);							\
 	gsymbol_setval(sym, gpop_object(state));	\
-} while (0)							\
+} while (0)
+
+#define GUTIL_ADDSTRINGLIT(state, name, value) \
+do \
+{ \
+	gsymbol_t* sym = gsymbol_create(state, name);	\
+	gpush_string(state, value, sizeof value - 1, 1);	\
+	gsymbol_setval(sym, gpop_object(state)); \
+} while(0)
+
+#define GUTIL_ADDSTRING(state, name, value)	\
+do 		\
+{		\
+	gsymbol_t* sym = gsymbol_create(state, name);	\
+	gpush_string(state, value, strlen(name), 0);	\
+	gsymbol_setval(sym, gpop_object(state)); \
+} while(0)
+
+#define GUTIL_ADDBOOL(state, name, value) \
+do \
+{ \
+	gsymbol_t* sym = gsymbol_create(state, name);	\
+	gpush_boolean(state, value); \
+	gsymbol_setval(sym, gpop_object(state)); \
+} while(0)
 
 void gfatal_error(const char* format, ...);
 
