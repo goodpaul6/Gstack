@@ -969,6 +969,19 @@ void dofile_prim(gstate_t* state)
 	fclose(file);
 }
 
+void str_cat_prim(gstate_t* state)
+{
+	gobject_t* s2 = gpop_expect(state, OBJ_STRING);
+	gobject_t* s1 = gpop_expect(state, OBJ_STRING);
+
+	char* str = malloc(sizeof(char) * (s1->string.length + s2->string.length) + 1);
+	if(!str) gfatal_error("out of memory\n");
+	strcpy(str, s1->string.value);
+	strcpy(str + s1->string.length, s2->string.value);
+	str[s1->string.length + s2->string.length] = '\0';
+	gpush_string(state, str, s1->string.length + s2->string.length, 0);
+}
+
 static gprimitivereg_t standard_library[] =
 {
 	{"add", add_prim},
@@ -1043,6 +1056,7 @@ static gprimitivereg_t standard_library[] =
 	{"random.seed", srand_prim},
 	{"random.float", rand_prim},
 	{"dofile", dofile_prim},
+	{"str.cat", str_cat_prim},
 	{"", NULL}
 };
 

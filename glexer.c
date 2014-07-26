@@ -96,6 +96,8 @@ void gread_token()
 			gtoken.type = TOK_SET;
 		if(strcmp(gtoken.buffer, "create") == 0)
 			gtoken.type = TOK_CREATE;
+		
+		gtoken.length = i;
 	}
 	else if(c == '0' && peek(in) == 'x')
 	{
@@ -114,6 +116,7 @@ void gread_token()
 		gtoken.buffer[i] = '\0';
 		gtoken.type = TOK_NUMBER;
 		gtoken.number = strtol(gtoken.buffer, NULL, 16);
+		gtoken.length = i;
 	}
 	else if(c == '[')
 		gtoken.type = TOK_OPENLIST;
@@ -138,6 +141,7 @@ void gread_token()
 		ungetc(c, in);
 		gtoken.buffer[i] = '\0';
 		gtoken.type = TOK_CALL;
+		gtoken.length = i;
 	}
 	else if(isdigit(c) || c == '.' || c == '-')
 	{
@@ -154,6 +158,7 @@ void gread_token()
 		gtoken.buffer[i] = '\0';
 		gtoken.type = TOK_NUMBER;
 		
+		gtoken.length = i;
 		gtoken.number = (float)strtod(gtoken.buffer, NULL); 
 	}
 	else if(c == '\'')
@@ -190,6 +195,7 @@ void gread_token()
 		}
 		gtoken.buffer[i] = '\0';
 		gtoken.type = TOK_STRING;
+		gtoken.length = i;
 	}
 	else if(c == '{')
 		gtoken.type = TOK_OPENBLOCK;
@@ -211,7 +217,6 @@ void gread_token()
 		}
 	}
 	
-	gtoken.length = i;
 	gerrlineno = gtoken.lineno;
 }
 
